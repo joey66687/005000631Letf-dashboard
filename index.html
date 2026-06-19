@@ -45,7 +45,6 @@
       margin-bottom: 14px;
     }
 
-    /* 股價 */
     .price-row {
       display: flex;
       justify-content: space-between;
@@ -102,14 +101,12 @@
     .badge-closed { background: rgba(148,163,184,.1); color: var(--muted); }
     .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
-    /* 曝險率大卡 */
     .exposure-card {
       background: var(--surface);
       border-radius: 14px;
       padding: 28px 16px 20px;
       margin-bottom: 12px;
       text-align: center;
-      position: relative;
     }
     .exposure-label {
       font-size: 11px;
@@ -127,15 +124,10 @@
       transition: color .3s;
     }
     .exposure-target { font-size: 12px; color: var(--muted); margin-top: 8px; }
-    .exposure-deviation {
-      font-size: 14px;
-      font-weight: 600;
-      margin-top: 6px;
-    }
+    .exposure-deviation { font-size: 14px; font-weight: 600; margin-top: 6px; }
     .safe { color: var(--green); }
     .warn { color: var(--red); }
 
-    /* 配置長條 */
     .alloc-bar {
       display: flex;
       height: 8px;
@@ -158,23 +150,17 @@
       vertical-align: middle;
     }
 
-    /* 統計格 */
     .stats-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
       margin-top: 14px;
     }
-    .stat {
-      background: var(--surface2);
-      border-radius: 10px;
-      padding: 12px;
-    }
+    .stat { background: var(--surface2); border-radius: 10px; padding: 12px; }
     .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
     .stat-value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .stat-full { grid-column: span 2; }
 
-    /* 輸入 */
     .input-row {
       display: flex;
       align-items: center;
@@ -237,7 +223,6 @@
   ⚠️ 股價抓取失敗，請確認網路連線或稍後再試
 </div>
 
-<!-- 股價 -->
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
     <span class="card-title" style="margin-bottom:0">即時股價</span>
@@ -274,7 +259,6 @@
   </div>
 </div>
 
-<!-- 曝險率 -->
 <div class="exposure-card">
   <div class="exposure-label">綜合曝險率</div>
   <div class="exposure-value flat" id="exposureValue">--%</div>
@@ -282,7 +266,6 @@
   <div class="exposure-deviation" id="exposureDev"></div>
 </div>
 
-<!-- 配置 -->
 <div class="card">
   <div class="card-title">資產配置</div>
 
@@ -311,7 +294,6 @@
   </div>
 </div>
 
-<!-- 持股 -->
 <div class="card">
   <div class="card-title">持股設定</div>
 
@@ -340,11 +322,15 @@
 <script>
   const DEVIATION_LIMIT = 10;
   const TARGET_EXPOSURE = 150;
-  const YF_TICKERS = { '0050': '0050.TW', '00631L': '00631L.TW' };
+
+  const TWSE_TARGET = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_0050.tw|tse_00631l.tw&json=1&delay=0';
+  const PROXIES = [
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  ];
 
   let prices = {};
 
-  /* 是否台股交易時間（台北時間 09:00–13:30，週一到五） */
   function isMarketOpen() {
     const tw = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
     const d = tw.getDay();
@@ -363,22 +349,26 @@
     }
   }
 
-  async function fetchOneTicker(code, sym) {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`;
-    const res = await fetch(url, { cache: 'no-cache' });
-    if (!res.ok) throw new Error(`HTTP ${res.status} for ${sym}`);
-    const json = await res.json();
-    const meta = json.chart.result[0].meta;
-    return { code, price: meta.regularMarketPrice, prev: meta.chartPreviousClose ?? meta.previousClose };
-  }
-
   async function fetchPrices() {
-    const results = await Promise.all(
-      Object.entries(YF_TICKERS).map(([code, sym]) => fetchOneTicker(code, sym))
-    );
-    const out = {};
-    results.forEach(r => out[r.code] = { price: r.price, prev: r.prev });
-    return out;
+    for (const makeUrl of PROXIES) {
+      try {
+        const res = await fetch(makeUrl(TWSE_TARGET), { cache: 'no-cache' });
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (!data.msgArray) continue;
+        const result = {};
+        data.msgArray.forEach(s => {
+          const code = s.c.toUpperCase();
+          const current = s.z !== '-' ? parseFloat(s.z) : null;
+          const prev = parseFloat(s.y);
+          result[code] = { price: current ?? prev, prev };
+        });
+        return result;
+      } catch (e) {
+        console.warn('proxy failed, trying next...', e);
+      }
+    }
+    throw new Error('所有來源都失敗');
   }
 
   function fmt(n) {
@@ -436,7 +426,6 @@
     const dev = exposure - TARGET_EXPOSURE;
     const isWarn = Math.abs(dev) > DEVIATION_LIMIT;
 
-    // 曝險率
     const expEl = document.getElementById('exposureValue');
     expEl.textContent = exposure.toFixed(1) + '%';
     expEl.className = 'exposure-value ' + (isWarn ? 'warn' : 'safe');
@@ -451,13 +440,11 @@
       devEl.className = 'exposure-deviation safe';
     }
 
-    // 配置長條
     document.getElementById('bar0050').style.width = pct0050.toFixed(2) + '%';
     document.getElementById('bar00631L').style.width = pct00631L.toFixed(2) + '%';
     document.getElementById('pct0050').textContent = pct0050.toFixed(1) + '%';
     document.getElementById('pct00631L').textContent = pct00631L.toFixed(1) + '%';
 
-    // 市值
     document.getElementById('val0050').textContent = fmt(v0050);
     document.getElementById('val00631L').textContent = fmt(v00631L);
     document.getElementById('valTotal').textContent = fmt(total);
@@ -476,7 +463,6 @@
     if (s6) document.getElementById('shares00631L').value = s6;
   }
 
-  /* 交易時間內每 60 秒自動刷新 */
   function scheduleAutoRefresh() {
     if (isMarketOpen()) {
       setTimeout(() => fetchAndUpdate().then(scheduleAutoRefresh), 60000);
