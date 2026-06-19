@@ -322,12 +322,6 @@
 <script>
   const DEVIATION_LIMIT = 10;
   const TARGET_EXPOSURE = 150;
-  const FETCH_TIMEOUT = 8000;
-
-  const PROXIES = [
-    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-  ];
 
   let prices = {};
 
@@ -350,35 +344,50 @@
   }
 
   async function fetchOneStock(code) {
-    const twseUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${code.toLowerCase()}.tw&json=1&delay=0`;
-    for (const makeUrl of PROXIES) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-      try {
-        const res = await fetch(makeUrl(twseUrl), { cache: 'no-cache', signal: controller.signal });
-        clearTimeout(timer);
-        if (!res.ok) continue;
-        const data = await res.json();
-        if (!data.msgArray?.length) continue;
-        const s = data.msgArray[0];
-        const current = s.z !== '-' ? parseFloat(s.z) : null;
-        const prev = parseFloat(s.y);
-        if (isNaN(prev)) continue;
-        return { price: current ?? prev, prev };
-      } catch (e) {
-        clearTimeout(timer);
-        console.warn(`${code} proxy failed:`, e.message);
-      }
-    }
-    throw new Error(`無法取得 ${code} 股價`);
+    const url = `https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY?stockNo=${code}`;
+    const res = await fetch(url, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status} (${code})`);
+    const data = await res.json();
+    if (!Array.isArray(data) || !data.length) throw new Error(`無資料 (${code})`);
+    const latest = data[data.length - 1];
+    const priceStr = (latest['收盤價'] || latest.ClosingPrice || '').replace(/,/g, '');
+    const signStr  = (latest['漲跌(+/-)'] || latest['漲跌(+/-）'] || '+').trim();
+    const magStr   = (latest['漲跌價差']  || latest.Change || '0').replace(/,/g, '');
+    const price = parseFloat(priceStr);
+    if (isNaN(price)) throw new Error(`股價格式錯誤 (${code}): ${priceStr}`);
+    const mag    = parseFloat(magStr) || 0;
+    const change = signStr === '-' ? -mag : mag;
+    return { price, prev: price - change };
   }
 
   async function fetchPrices() {
-    const [r0050, r00631L] = await Promise.all([
-      fetchOneStock('0050'),
-      fetchOneStock('00631L'),
-    ]);
-    return { '0050': r0050, '00631L': r00631L };
+    try {
+      const [r0050, r00631L] = await Promise.all([
+        fetchOneStock('0050'),
+        fetchOneStock('00631L'),
+      ]);
+      return { '0050': r0050, '00631L': r00631L };
+    } catch(e) {
+      console.warn('STOCK_DAY failed, trying STOCK_DAY_ALL:', e.message);
+    }
+    // 備用：一次抓所有股票再篩選
+    const res = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL', { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const result = {};
+    for (const item of data) {
+      const code = (item['證券代號'] || item.Code || '').trim();
+      if (code !== '0050' && code !== '00631L') continue;
+      const priceStr = (item['收盤價'] || item.ClosingPrice || '').replace(/,/g, '');
+      const signStr  = (item['漲跌(+/-)'] || item['漲跌(+/-）'] || '+').trim();
+      const magStr   = (item['漲跌價差']  || item.Change || '0').replace(/,/g, '');
+      const price = parseFloat(priceStr);
+      if (isNaN(price)) continue;
+      const mag = parseFloat(magStr) || 0;
+      result[code] = { price, prev: price - (signStr === '-' ? -mag : mag) };
+    }
+    if (!result['0050'] || !result['00631L']) throw new Error('找不到股票資料');
+    return result;
   }
 
   function fmt(n) {
