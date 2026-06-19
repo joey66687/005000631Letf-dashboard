@@ -185,22 +185,23 @@
       -moz-appearance: textfield;
     }
     .input-field:focus { outline: none; border-color: var(--blue); }
-    .input-unit { font-size: 13px; color: var(--muted); width: 14px; }
-    .hint { font-size: 11px; color: var(--muted); margin-top: 10px; }
-
-    .btn {
-      width: 100%;
-      padding: 13px;
-      border-radius: 10px;
-      border: none;
+    .input-field-sm {
+      width: 85px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
       font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 12px;
-      transition: opacity .15s;
+      padding: 8px 8px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      appearance: none;
+      -moz-appearance: textfield;
     }
-    .btn:active { opacity: .8; }
-    .btn-primary { background: var(--blue); color: #fff; }
+    .input-field-sm:focus { outline: none; border-color: var(--blue); }
+    .input-unit { font-size: 13px; color: var(--muted); }
+    .input-eq { font-size: 13px; color: var(--muted); padding: 0 2px; }
+    .hint { font-size: 11px; color: var(--muted); margin-top: 10px; }
 
     .error-bar {
       background: rgba(239,68,68,.12);
@@ -302,8 +303,11 @@
       <strong>0050</strong>
       <small>元大台灣 50</small>
     </div>
-    <input type="number" class="input-field" id="shares0050" placeholder="0" min="0">
+    <input type="number" class="input-field-sm" id="shares0050" placeholder="股數" min="0">
     <span class="input-unit">股</span>
+    <span class="input-eq">=</span>
+    <input type="number" class="input-field-sm" id="mktval0050" placeholder="市值" min="0">
+    <span class="input-unit">元</span>
   </div>
 
   <div class="input-row">
@@ -311,12 +315,14 @@
       <strong>00631L</strong>
       <small>元大台灣 50 正 2</small>
     </div>
-    <input type="number" class="input-field" id="shares00631L" placeholder="0" min="0">
+    <input type="number" class="input-field-sm" id="shares00631L" placeholder="股數" min="0">
     <span class="input-unit">股</span>
+    <span class="input-eq">=</span>
+    <input type="number" class="input-field-sm" id="mktval00631L" placeholder="市值" min="0">
+    <span class="input-unit">元</span>
   </div>
 
-  <p class="hint">1 張 = 1,000 股｜數字存在瀏覽器，下次開啟自動載入</p>
-  <button class="btn btn-primary" onclick="saveAndCalc()">儲存並計算</button>
+  <p class="hint">輸入股數或市值，另一欄自動換算｜1 張 = 1,000 股</p>
 </div>
 
 <script>
@@ -432,9 +438,30 @@
     document.getElementById('valTotal').textContent = fmt(total);
   }
 
-  function saveAndCalc() {
-    localStorage.setItem('sh_0050', document.getElementById('shares0050').value);
-    localStorage.setItem('sh_00631L', document.getElementById('shares00631L').value);
+  let saveTimer = null;
+  function autoSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      localStorage.setItem('sh_0050', document.getElementById('shares0050').value);
+      localStorage.setItem('sh_00631L', document.getElementById('shares00631L').value);
+    }, 400);
+  }
+
+  function syncFromShares(code) {
+    const shares = parseFloat(document.getElementById('shares' + code).value) || 0;
+    const price = prices[code]?.price;
+    const valEl = document.getElementById('mktval' + code);
+    valEl.value = (price && shares) ? Math.round(shares * price) : '';
+    autoSave();
+    calculate();
+  }
+
+  function syncFromMktval(code) {
+    const mktval = parseFloat(document.getElementById('mktval' + code).value) || 0;
+    const price = prices[code]?.price;
+    const sharesEl = document.getElementById('shares' + code);
+    sharesEl.value = (price && mktval) ? Math.round(mktval / price) : '';
+    autoSave();
     calculate();
   }
 
@@ -445,16 +472,32 @@
     if (s6) document.getElementById('shares00631L').value = s6;
   }
 
+  function syncMktvalAfterPrices() {
+    ['0050', '00631L'].forEach(code => {
+      const shares = parseFloat(document.getElementById('shares' + code).value) || 0;
+      const price = prices[code]?.price;
+      if (price && shares) {
+        document.getElementById('mktval' + code).value = Math.round(shares * price);
+      }
+    });
+  }
+
   function scheduleAutoRefresh() {
     if (isMarketOpen()) {
       setTimeout(() => fetchAndUpdate().then(scheduleAutoRefresh), 60000);
     }
   }
 
+  // 雙向即時換算
+  document.getElementById('shares0050').addEventListener('input', () => syncFromShares('0050'));
+  document.getElementById('mktval0050').addEventListener('input', () => syncFromMktval('0050'));
+  document.getElementById('shares00631L').addEventListener('input', () => syncFromShares('00631L'));
+  document.getElementById('mktval00631L').addEventListener('input', () => syncFromMktval('00631L'));
+
   updateMarketBadge();
   setInterval(updateMarketBadge, 60000);
   loadSaved();
-  fetchAndUpdate().then(scheduleAutoRefresh);
+  fetchAndUpdate().then(() => { syncMktvalAfterPrices(); scheduleAutoRefresh(); });
 </script>
 
 </body>
