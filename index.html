@@ -322,8 +322,8 @@
 <script>
   const DEVIATION_LIMIT = 10;
   const TARGET_EXPOSURE = 150;
+  const FETCH_TIMEOUT = 8000;
 
-  const TWSE_TARGET = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_0050.tw|tse_00631l.tw&json=1&delay=0';
   const PROXIES = [
     u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
     u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
@@ -349,26 +349,36 @@
     }
   }
 
-  async function fetchPrices() {
+  async function fetchOneStock(code) {
+    const twseUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${code.toLowerCase()}.tw&json=1&delay=0`;
     for (const makeUrl of PROXIES) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
       try {
-        const res = await fetch(makeUrl(TWSE_TARGET), { cache: 'no-cache' });
+        const res = await fetch(makeUrl(twseUrl), { cache: 'no-cache', signal: controller.signal });
+        clearTimeout(timer);
         if (!res.ok) continue;
         const data = await res.json();
-        if (!data.msgArray) continue;
-        const result = {};
-        data.msgArray.forEach(s => {
-          const code = s.c.toUpperCase();
-          const current = s.z !== '-' ? parseFloat(s.z) : null;
-          const prev = parseFloat(s.y);
-          result[code] = { price: current ?? prev, prev };
-        });
-        return result;
+        if (!data.msgArray?.length) continue;
+        const s = data.msgArray[0];
+        const current = s.z !== '-' ? parseFloat(s.z) : null;
+        const prev = parseFloat(s.y);
+        if (isNaN(prev)) continue;
+        return { price: current ?? prev, prev };
       } catch (e) {
-        console.warn('proxy failed, trying next...', e);
+        clearTimeout(timer);
+        console.warn(`${code} proxy failed:`, e.message);
       }
     }
-    throw new Error('所有來源都失敗');
+    throw new Error(`無法取得 ${code} 股價`);
+  }
+
+  async function fetchPrices() {
+    const [r0050, r00631L] = await Promise.all([
+      fetchOneStock('0050'),
+      fetchOneStock('00631L'),
+    ]);
+    return { '0050': r0050, '00631L': r00631L };
   }
 
   function fmt(n) {
