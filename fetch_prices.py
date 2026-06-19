@@ -2,7 +2,7 @@ import json
 import urllib.request
 from datetime import datetime, timezone, timedelta
 
-url = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_0050.tw|tse_00631l.tw&json=1&delay=0'
+url = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_0050.tw|tse_00631L.tw&json=1&delay=0'
 with urllib.request.urlopen(url) as r:
     data = json.loads(r.read())
 
