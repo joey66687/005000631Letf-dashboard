@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ETF 曝險儀表板</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg: #0f172a;
@@ -54,165 +55,107 @@
     .price-row + .price-row { border-top: 1px solid var(--border); }
     .stock-name { font-weight: 700; font-size: 15px; }
     .stock-desc { font-size: 11px; color: var(--muted); margin-top: 1px; }
-    .price-value {
-      font-size: 20px;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      text-align: right;
-    }
-    .price-change {
-      font-size: 12px;
-      font-variant-numeric: tabular-nums;
-      text-align: right;
-      margin-top: 1px;
-    }
+    .price-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+    .price-change { font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; margin-top: 1px; }
     .up { color: var(--red); }
     .down { color: var(--green); }
     .flat { color: var(--muted); }
 
-    .refresh-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 12px;
-    }
+    .refresh-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
     .last-update { font-size: 11px; color: var(--muted); }
     .refresh-btn {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      border-radius: 6px;
-      padding: 4px 10px;
-      font-size: 12px;
-      cursor: pointer;
+      background: none; border: 1px solid var(--border); color: var(--muted);
+      border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
     }
     .refresh-btn:hover { color: var(--text); border-color: var(--muted); }
 
-    .market-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 9px;
-      border-radius: 20px;
-    }
+    .market-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
     .badge-open { background: rgba(34,197,94,.15); color: var(--green); }
     .badge-closed { background: rgba(148,163,184,.1); color: var(--muted); }
     .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
-    .exposure-card {
-      background: var(--surface);
-      border-radius: 14px;
-      padding: 28px 16px 20px;
-      margin-bottom: 12px;
-      text-align: center;
-    }
-    .exposure-label {
-      font-size: 11px;
-      color: var(--muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 10px;
-    }
-    .exposure-value {
-      font-size: 64px;
-      font-weight: 800;
-      line-height: 1;
-      font-variant-numeric: tabular-nums;
-      transition: color .3s;
-    }
+    .exposure-card { background: var(--surface); border-radius: 14px; padding: 28px 16px 20px; margin-bottom: 12px; text-align: center; }
+    .exposure-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+    .exposure-value { font-size: 64px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; transition: color .3s; }
     .exposure-target { font-size: 12px; color: var(--muted); margin-top: 8px; }
     .exposure-deviation { font-size: 14px; font-weight: 600; margin-top: 6px; }
     .safe { color: var(--green); }
     .warn { color: var(--red); }
 
-    .alloc-bar {
-      display: flex;
-      height: 8px;
-      border-radius: 4px;
-      overflow: hidden;
-      margin: 10px 0 8px;
-    }
+    .alloc-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0 8px; }
     .bar-0050 { background: var(--blue); transition: width .4s ease; }
     .bar-00631L { background: var(--orange); transition: width .4s ease; }
-    .alloc-legend {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-    }
-    .dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      margin-right: 5px;
-      vertical-align: middle;
-    }
+    .alloc-legend { display: flex; justify-content: space-between; font-size: 12px; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
 
-    .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-top: 14px;
-    }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
     .stat { background: var(--surface2); border-radius: 10px; padding: 12px; }
     .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
     .stat-value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .stat-full { grid-column: span 2; }
 
-    .input-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 11px 0;
-    }
+    .input-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; }
     .input-row + .input-row { border-top: 1px solid var(--border); }
     .input-label { flex: 1; }
     .input-label strong { font-size: 14px; }
     .input-label small { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
-    .input-field {
-      width: 110px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-size: 16px;
-      padding: 8px 10px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-      appearance: none;
-      -moz-appearance: textfield;
-    }
-    .input-field:focus { outline: none; border-color: var(--blue); }
     .input-field-sm {
-      width: 85px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-size: 15px;
-      padding: 8px 8px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-      appearance: none;
-      -moz-appearance: textfield;
+      width: 85px; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 15px; padding: 8px 8px;
+      text-align: right; font-variant-numeric: tabular-nums; appearance: none; -moz-appearance: textfield;
     }
     .input-field-sm:focus { outline: none; border-color: var(--blue); }
     .input-unit { font-size: 13px; color: var(--muted); }
     .input-eq { font-size: 13px; color: var(--muted); padding: 0 2px; }
     .hint { font-size: 11px; color: var(--muted); margin-top: 10px; }
 
-    .error-bar {
-      background: rgba(239,68,68,.12);
-      border: 1px solid rgba(239,68,68,.3);
-      border-radius: 10px;
-      padding: 10px 14px;
-      font-size: 13px;
-      color: #fca5a5;
-      margin-bottom: 12px;
-      display: none;
+    .note-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 14px; padding: 10px 12px;
+      margin-bottom: 10px;
     }
+    .note-input:focus { outline: none; border-color: var(--blue); }
+    .note-input::placeholder { color: var(--muted); }
+
+    .btn { width: 100%; padding: 13px; border-radius: 10px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; transition: opacity .15s; }
+    .btn:active { opacity: .8; }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-secondary { background: var(--surface2); color: var(--text); }
+
+    .error-bar {
+      background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3);
+      border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #fca5a5;
+      margin-bottom: 12px; display: none;
+    }
+
+    /* 歷史圖表 */
+    .chart-wrap { position: relative; height: 180px; margin-bottom: 12px; }
+    .chart-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+    .chart-tab {
+      flex: 1; padding: 7px; border-radius: 8px; border: 1px solid var(--border);
+      background: none; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .chart-tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+    /* 歷史表格 */
+    .history-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+    .history-table th { color: var(--muted); font-weight: 600; padding: 6px 4px; text-align: left; border-bottom: 1px solid var(--border); }
+    .history-table td { padding: 8px 4px; border-bottom: 1px solid rgba(51,65,85,.5); vertical-align: top; }
+    .history-table tr:last-child td { border-bottom: none; }
+    .del-btn {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 14px; padding: 0 4px; line-height: 1;
+    }
+    .del-btn:hover { color: var(--red); }
+    .record-note { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .exposure-tag {
+      display: inline-block; padding: 2px 6px; border-radius: 4px;
+      font-weight: 700; font-size: 12px;
+    }
+    .tag-safe { background: rgba(34,197,94,.15); color: var(--green); }
+    .tag-warn { background: rgba(239,68,68,.15); color: var(--red); }
+
+    .empty-state { text-align: center; color: var(--muted); padding: 24px 0; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -220,46 +163,29 @@
 <h1>ETF 曝險儀表板</h1>
 <p class="subtitle">0050 + 00631L 組合觀測</p>
 
-<div id="errorBar" class="error-bar">
-  ⚠️ 股價抓取失敗，請確認網路連線或稍後再試
-</div>
+<div id="errorBar" class="error-bar">⚠️ 股價抓取失敗，請確認網路連線或稍後再試</div>
 
+<!-- 股價 -->
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
     <span class="card-title" style="margin-bottom:0">即時股價</span>
-    <span id="marketBadge" class="market-badge badge-closed">
-      <span class="badge-dot"></span>收盤中
-    </span>
+    <span id="marketBadge" class="market-badge badge-closed"><span class="badge-dot"></span>收盤中</span>
   </div>
-
   <div class="price-row">
-    <div>
-      <div class="stock-name">0050</div>
-      <div class="stock-desc">元大台灣 50</div>
-    </div>
-    <div>
-      <div class="price-value" id="price0050">--</div>
-      <div class="price-change flat" id="change0050">--</div>
-    </div>
+    <div><div class="stock-name">0050</div><div class="stock-desc">元大台灣 50</div></div>
+    <div><div class="price-value" id="price0050">--</div><div class="price-change flat" id="change0050">--</div></div>
   </div>
-
   <div class="price-row">
-    <div>
-      <div class="stock-name">00631L</div>
-      <div class="stock-desc">元大台灣 50 正 2（2×）</div>
-    </div>
-    <div>
-      <div class="price-value" id="price00631L">--</div>
-      <div class="price-change flat" id="change00631L">--</div>
-    </div>
+    <div><div class="stock-name">00631L</div><div class="stock-desc">元大台灣 50 正 2（2×）</div></div>
+    <div><div class="price-value" id="price00631L">--</div><div class="price-change flat" id="change00631L">--</div></div>
   </div>
-
   <div class="refresh-row">
     <span class="last-update" id="lastUpdate">尚未更新</span>
     <button class="refresh-btn" onclick="fetchAndUpdate()">↻ 重新整理</button>
   </div>
 </div>
 
+<!-- 曝險率 -->
 <div class="exposure-card">
   <div class="exposure-label">綜合曝險率</div>
   <div class="exposure-value flat" id="exposureValue">--%</div>
@@ -267,9 +193,9 @@
   <div class="exposure-deviation" id="exposureDev"></div>
 </div>
 
+<!-- 配置 -->
 <div class="card">
   <div class="card-title">資產配置</div>
-
   <div class="alloc-bar">
     <div class="bar-0050" id="bar0050" style="width:50%"></div>
     <div class="bar-00631L" id="bar00631L" style="width:50%"></div>
@@ -278,51 +204,59 @@
     <span><span class="dot" style="background:var(--blue)"></span>0050 <strong id="pct0050">--%</strong></span>
     <span><span class="dot" style="background:var(--orange)"></span>00631L <strong id="pct00631L">--%</strong></span>
   </div>
-
   <div class="stats-grid">
-    <div class="stat">
-      <div class="stat-label">0050 市值</div>
-      <div class="stat-value" id="val0050">--</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">00631L 市值</div>
-      <div class="stat-value" id="val00631L">--</div>
-    </div>
-    <div class="stat stat-full">
-      <div class="stat-label">總資產</div>
-      <div class="stat-value" id="valTotal">--</div>
-    </div>
+    <div class="stat"><div class="stat-label">0050 市值</div><div class="stat-value" id="val0050">--</div></div>
+    <div class="stat"><div class="stat-label">00631L 市值</div><div class="stat-value" id="val00631L">--</div></div>
+    <div class="stat stat-full"><div class="stat-label">總資產</div><div class="stat-value" id="valTotal">--</div></div>
   </div>
 </div>
 
+<!-- 持股設定 -->
 <div class="card">
   <div class="card-title">持股設定</div>
-
   <div class="input-row">
-    <div class="input-label">
-      <strong>0050</strong>
-      <small>元大台灣 50</small>
-    </div>
+    <div class="input-label"><strong>0050</strong><small>元大台灣 50</small></div>
     <input type="number" class="input-field-sm" id="shares0050" placeholder="股數" min="0">
     <span class="input-unit">股</span>
     <span class="input-eq">=</span>
     <input type="number" class="input-field-sm" id="mktval0050" placeholder="市值" min="0">
     <span class="input-unit">元</span>
   </div>
-
   <div class="input-row">
-    <div class="input-label">
-      <strong>00631L</strong>
-      <small>元大台灣 50 正 2</small>
-    </div>
+    <div class="input-label"><strong>00631L</strong><small>元大台灣 50 正 2</small></div>
     <input type="number" class="input-field-sm" id="shares00631L" placeholder="股數" min="0">
     <span class="input-unit">股</span>
     <span class="input-eq">=</span>
     <input type="number" class="input-field-sm" id="mktval00631L" placeholder="市值" min="0">
     <span class="input-unit">元</span>
   </div>
-
   <p class="hint">輸入股數或市值，另一欄自動換算｜1 張 = 1,000 股</p>
+</div>
+
+<!-- 快照記錄 -->
+<div class="card">
+  <div class="card-title">儲存快照</div>
+  <input type="text" id="snapNote" class="note-input" placeholder="備注（例如：初始建倉、再平衡）">
+  <button class="btn btn-primary" onclick="saveSnapshot()">📸 儲存今日快照</button>
+</div>
+
+<!-- 歷史圖表 -->
+<div class="card" id="historyChartCard" style="display:none">
+  <div class="card-title">歷史走勢</div>
+  <div class="chart-tabs">
+    <button class="chart-tab active" onclick="switchChart('exposure')">曝險率</button>
+    <button class="chart-tab" onclick="switchChart('value')">總資產</button>
+  </div>
+  <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+</div>
+
+<!-- 歷史記錄表 -->
+<div class="card" id="historyTableCard" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <span class="card-title" style="margin-bottom:0">歷史記錄</span>
+    <button class="refresh-btn" onclick="exportCSV()">匯出 CSV</button>
+  </div>
+  <div id="historyTableWrap"></div>
 </div>
 
 <script>
@@ -330,6 +264,8 @@
   const TARGET_EXPOSURE = 150;
 
   let prices = {};
+  let chartInstance = null;
+  let currentChartType = 'exposure';
 
   function isMarketOpen() {
     const tw = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
@@ -356,10 +292,7 @@
     const s = data.stocks;
     if (!s?.['0050'] || !s?.['00631L']) throw new Error('data.json 格式錯誤');
     if (!s['0050'].price || !s['00631L'].price) throw new Error('等待 GitHub Actions 第一次更新');
-    // 把更新時間顯示出來
-    if (data.updated) {
-      document.getElementById('lastUpdate').textContent = '資料時間：' + data.updated;
-    }
+    if (data.updated) document.getElementById('lastUpdate').textContent = '資料時間：' + data.updated;
     return s;
   }
 
@@ -372,7 +305,6 @@
     try {
       prices = await fetchPrices();
       document.getElementById('errorBar').style.display = 'none';
-
       ['0050', '00631L'].forEach(code => {
         const s = prices[code];
         if (!s) return;
@@ -380,13 +312,11 @@
         const pct = (ch / s.prev) * 100;
         const sign = ch >= 0 ? '+' : '';
         const cls = ch > 0 ? 'up' : ch < 0 ? 'down' : 'flat';
-
         document.getElementById('price' + code).textContent = s.price.toFixed(2);
         const chEl = document.getElementById('change' + code);
         chEl.textContent = `${sign}${ch.toFixed(2)}（${sign}${pct.toFixed(2)}%）`;
         chEl.className = 'price-change ' + cls;
       });
-
       calculate();
     } catch (e) {
       document.getElementById('errorBar').style.display = 'block';
@@ -399,45 +329,36 @@
     const sh00631L = parseFloat(document.getElementById('shares00631L').value) || 0;
     const p0050 = prices['0050']?.price;
     const p00631L = prices['00631L']?.price;
-
     if (!p0050 || !p00631L) return;
     if (sh0050 === 0 && sh00631L === 0) return;
-
     const v0050 = sh0050 * p0050;
     const v00631L = sh00631L * p00631L;
     const total = v0050 + v00631L;
     if (total === 0) return;
-
     const exposure = (v0050 * 1 + v00631L * 2) / total * 100;
     const pct0050 = v0050 / total * 100;
     const pct00631L = v00631L / total * 100;
     const dev = exposure - TARGET_EXPOSURE;
     const isWarn = Math.abs(dev) > DEVIATION_LIMIT;
-
     const expEl = document.getElementById('exposureValue');
     expEl.textContent = exposure.toFixed(1) + '%';
     expEl.className = 'exposure-value ' + (isWarn ? 'warn' : 'safe');
-
     const devEl = document.getElementById('exposureDev');
     const sign = dev >= 0 ? '+' : '';
-    if (isWarn) {
-      devEl.textContent = `偏離目標 ${sign}${dev.toFixed(1)} 個百分點　⚠ 建議再平衡`;
-      devEl.className = 'exposure-deviation warn';
-    } else {
-      devEl.textContent = `偏離目標 ${sign}${dev.toFixed(1)} 個百分點　✓ 在安全範圍內`;
-      devEl.className = 'exposure-deviation safe';
-    }
-
+    devEl.textContent = isWarn
+      ? `偏離目標 ${sign}${dev.toFixed(1)} 個百分點　⚠ 建議再平衡`
+      : `偏離目標 ${sign}${dev.toFixed(1)} 個百分點　✓ 在安全範圍內`;
+    devEl.className = 'exposure-deviation ' + (isWarn ? 'warn' : 'safe');
     document.getElementById('bar0050').style.width = pct0050.toFixed(2) + '%';
     document.getElementById('bar00631L').style.width = pct00631L.toFixed(2) + '%';
     document.getElementById('pct0050').textContent = pct0050.toFixed(1) + '%';
     document.getElementById('pct00631L').textContent = pct00631L.toFixed(1) + '%';
-
     document.getElementById('val0050').textContent = fmt(v0050);
     document.getElementById('val00631L').textContent = fmt(v00631L);
     document.getElementById('valTotal').textContent = fmt(total);
   }
 
+  /* 雙向換算 */
   let saveTimer = null;
   function autoSave() {
     clearTimeout(saveTimer);
@@ -446,49 +367,205 @@
       localStorage.setItem('sh_00631L', document.getElementById('shares00631L').value);
     }, 400);
   }
-
   function syncFromShares(code) {
     const shares = parseFloat(document.getElementById('shares' + code).value) || 0;
     const price = prices[code]?.price;
     const valEl = document.getElementById('mktval' + code);
     valEl.value = (price && shares) ? Math.round(shares * price) : '';
-    autoSave();
-    calculate();
+    autoSave(); calculate();
   }
-
   function syncFromMktval(code) {
     const mktval = parseFloat(document.getElementById('mktval' + code).value) || 0;
     const price = prices[code]?.price;
     const sharesEl = document.getElementById('shares' + code);
     sharesEl.value = (price && mktval) ? Math.round(mktval / price) : '';
-    autoSave();
-    calculate();
+    autoSave(); calculate();
   }
-
   function loadSaved() {
     const s0 = localStorage.getItem('sh_0050');
     const s6 = localStorage.getItem('sh_00631L');
     if (s0) document.getElementById('shares0050').value = s0;
     if (s6) document.getElementById('shares00631L').value = s6;
   }
-
   function syncMktvalAfterPrices() {
     ['0050', '00631L'].forEach(code => {
       const shares = parseFloat(document.getElementById('shares' + code).value) || 0;
       const price = prices[code]?.price;
-      if (price && shares) {
-        document.getElementById('mktval' + code).value = Math.round(shares * price);
-      }
+      if (price && shares) document.getElementById('mktval' + code).value = Math.round(shares * price);
     });
   }
 
-  function scheduleAutoRefresh() {
-    if (isMarketOpen()) {
-      setTimeout(() => fetchAndUpdate().then(scheduleAutoRefresh), 60000);
+  /* 快照 */
+  function saveSnapshot() {
+    const p0050 = prices['0050']?.price;
+    const p00631L = prices['00631L']?.price;
+    const sh0050 = parseFloat(document.getElementById('shares0050').value) || 0;
+    const sh00631L = parseFloat(document.getElementById('shares00631L').value) || 0;
+    if (!p0050 || !p00631L) { alert('請先確認股價已載入'); return; }
+    if (sh0050 === 0 && sh00631L === 0) { alert('請先輸入持股數量'); return; }
+    const v0050 = sh0050 * p0050;
+    const v00631L = sh00631L * p00631L;
+    const total = v0050 + v00631L;
+    const exposure = parseFloat(((v0050 + v00631L * 2) / total * 100).toFixed(1));
+    const tw = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+    const dateStr = tw.getFullYear() + '/' + String(tw.getMonth()+1).padStart(2,'0') + '/' + String(tw.getDate()).padStart(2,'0');
+    const timeStr = String(tw.getHours()).padStart(2,'0') + ':' + String(tw.getMinutes()).padStart(2,'0');
+    const note = document.getElementById('snapNote').value.trim();
+    const record = {
+      date: dateStr, time: timeStr,
+      p0050, p00631L, sh0050, sh00631L,
+      v0050: Math.round(v0050), v00631L: Math.round(v00631L),
+      total: Math.round(total), exposure, note
+    };
+    const history = getHistory();
+    history.push(record);
+    localStorage.setItem('etf_history', JSON.stringify(history));
+    document.getElementById('snapNote').value = '';
+    renderHistory();
+  }
+
+  function getHistory() {
+    try { return JSON.parse(localStorage.getItem('etf_history') || '[]'); } catch { return []; }
+  }
+
+  function deleteRecord(idx) {
+    const history = getHistory();
+    history.splice(idx, 1);
+    localStorage.setItem('etf_history', JSON.stringify(history));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const history = getHistory();
+    const chartCard = document.getElementById('historyChartCard');
+    const tableCard = document.getElementById('historyTableCard');
+    if (history.length === 0) {
+      chartCard.style.display = 'none';
+      tableCard.style.display = 'none';
+      return;
+    }
+    chartCard.style.display = 'block';
+    tableCard.style.display = 'block';
+    renderChart(history, currentChartType);
+    renderTable(history);
+  }
+
+  function switchChart(type) {
+    currentChartType = type;
+    document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    renderChart(getHistory(), type);
+  }
+
+  function renderChart(history, type) {
+    const labels = history.map(r => r.date + ' ' + r.time);
+    const data = type === 'exposure'
+      ? history.map(r => r.exposure)
+      : history.map(r => r.total);
+    const color = type === 'exposure' ? '#3b82f6' : '#22c55e';
+    const label = type === 'exposure' ? '曝險率 (%)' : '總資產 (NT$)';
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    if (chartInstance) chartInstance.destroy();
+    Chart.defaults.color = '#94a3b8';
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label,
+          data,
+          borderColor: color,
+          backgroundColor: color + '20',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => type === 'exposure'
+                ? ctx.parsed.y.toFixed(1) + '%'
+                : 'NT$' + Math.round(ctx.parsed.y).toLocaleString('zh-TW')
+            }
+          }
+        },
+        scales: {
+          x: { grid: { color: '#334155' }, ticks: { maxRotation: 45, font: { size: 10 } } },
+          y: {
+            grid: { color: '#334155' },
+            ticks: {
+              callback: v => type === 'exposure' ? v + '%' : 'NT$' + (v/10000).toFixed(0) + '萬'
+            },
+            ...(type === 'exposure' && {
+              min: Math.max(0, Math.min(...getHistory().map(r=>r.exposure)) - 10),
+              max: Math.max(...getHistory().map(r=>r.exposure)) + 10,
+            })
+          }
+        }
+      }
+    });
+    if (type === 'exposure') {
+      chartInstance.options.plugins.annotation = {};
     }
   }
 
-  // 雙向即時換算
+  function renderTable(history) {
+    const wrap = document.getElementById('historyTableWrap');
+    if (history.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">還沒有記錄</div>';
+      return;
+    }
+    const rows = [...history].reverse().map((r, revIdx) => {
+      const idx = history.length - 1 - revIdx;
+      const isWarn = Math.abs(r.exposure - TARGET_EXPOSURE) > DEVIATION_LIMIT;
+      const tagClass = isWarn ? 'tag-warn' : 'tag-safe';
+      return `<tr>
+        <td>
+          <div>${r.date}</div>
+          <div style="color:var(--muted);font-size:11px">${r.time}</div>
+          ${r.note ? `<div class="record-note">${r.note}</div>` : ''}
+        </td>
+        <td><span class="exposure-tag ${tagClass}">${r.exposure}%</span></td>
+        <td>
+          <div>0050: ${r.sh0050.toLocaleString()}</div>
+          <div>00631L: ${r.sh00631L.toLocaleString()}</div>
+        </td>
+        <td style="text-align:right">
+          <div style="font-variant-numeric:tabular-nums">NT$${Math.round(r.total/10000)}萬</div>
+          <button class="del-btn" onclick="deleteRecord(${idx})">✕</button>
+        </td>
+      </tr>`;
+    }).join('');
+    wrap.innerHTML = `<table class="history-table">
+      <thead><tr><th>日期</th><th>曝險率</th><th>持股</th><th style="text-align:right">資產</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  function exportCSV() {
+    const history = getHistory();
+    if (history.length === 0) return;
+    const header = '日期,時間,0050股價,00631L股價,0050持股,00631L持股,0050市值,00631L市值,總資產,曝險率,備注';
+    const rows = history.map(r =>
+      `${r.date},${r.time},${r.p0050},${r.p00631L},${r.sh0050},${r.sh00631L},${r.v0050},${r.v00631L},${r.total},${r.exposure}%,${r.note || ''}`
+    );
+    const csv = '﻿' + [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'etf-history.csv';
+    a.click();
+  }
+
+  function scheduleAutoRefresh() {
+    if (isMarketOpen()) setTimeout(() => fetchAndUpdate().then(scheduleAutoRefresh), 60000);
+  }
+
   document.getElementById('shares0050').addEventListener('input', () => syncFromShares('0050'));
   document.getElementById('mktval0050').addEventListener('input', () => syncFromMktval('0050'));
   document.getElementById('shares00631L').addEventListener('input', () => syncFromShares('00631L'));
@@ -497,8 +574,8 @@
   updateMarketBadge();
   setInterval(updateMarketBadge, 60000);
   loadSaved();
+  renderHistory();
   fetchAndUpdate().then(() => { syncMktvalAfterPrices(); scheduleAutoRefresh(); });
 </script>
-
 </body>
 </html>
